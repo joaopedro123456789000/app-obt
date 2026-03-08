@@ -184,9 +184,17 @@ async def google_login(request: Request):
     return RedirectResponse(url=auth_url)
 
 @api_router.get("/auth/callback")
-async def auth_callback(session_id: str, response: Response):
+async def auth_callback(request: Request, response: Response, session_id: str = None):
     """Handle OAuth callback"""
     try:
+        # Get session_id from query params
+        if not session_id:
+            # Try to get from request
+            session_id = request.query_params.get('session_id')
+        
+        if not session_id:
+            raise HTTPException(status_code=400, detail="Missing session_id")
+        
         # Exchange session_id for session_token
         import aiohttp
         async with aiohttp.ClientSession() as session:
@@ -242,14 +250,17 @@ async def auth_callback(session_id: str, response: Response):
             max_age=7*24*60*60
         )
         
-        # Get user for response
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        # Redirect to auth-callback page in frontend
+        base_url = str(request.base_url).rstrip('/')
+        frontend_callback = f"{base_url}/auth-callback?success=true"
         
-        return {"success": True, "user": user_doc}
+        return RedirectResponse(url=frontend_callback)
         
     except Exception as e:
         logger.error(f"Auth callback error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Redirect to login with error
+        base_url = str(request.base_url).rstrip('/')
+        return RedirectResponse(url=f"{base_url}/login?error=auth_failed")
 
 @api_router.get("/auth/me")
 async def get_me(user: User = Depends(require_auth)):

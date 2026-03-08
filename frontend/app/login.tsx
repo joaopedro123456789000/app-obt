@@ -1,15 +1,27 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export default function LoginScreen() {
-  const handleGoogleLogin = () => {
-    const authUrl = `${BACKEND_URL}/api/auth/google-login`;
-    Linking.openURL(authUrl);
+  const router = useRouter();
+
+  const handleGoogleLogin = async () => {
+    try {
+      const authUrl = `${BACKEND_URL}/api/auth/google-login`;
+      
+      if (Platform.OS === 'web') {
+        // On web, navigate directly
+        window.location.href = authUrl;
+      } else {
+        // On mobile, open in browser
+        await Linking.openURL(authUrl);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    }
   };
 
   return (
@@ -74,11 +86,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+      },
+    }),
   },
   title: {
     fontSize: 36,
@@ -101,11 +120,18 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+      },
+    }),
   },
   featureText: {
     fontSize: 16,
@@ -121,11 +147,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 5,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
+        cursor: 'pointer',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 5,
+      },
+    }),
   },
   buttonText: {
     color: '#FFF',

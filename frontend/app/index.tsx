@@ -1,13 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Redirect, useRouter, useSegments } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../store/useAuthStore';
 import { authApi } from '../utils/api';
 
 export default function Index() {
-  const { isAuthenticated, isLoading, setUser, setLoading } = useAuthStore();
+  const { isAuthenticated, setUser, setLoading } = useAuthStore();
   const router = useRouter();
-  const segments = useSegments();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     checkAuth();
@@ -18,24 +18,19 @@ export default function Index() {
       setLoading(true);
       const user = await authApi.checkAuth();
       setUser(user);
+      // User is authenticated
+      router.replace('/(tabs)');
     } catch (error) {
+      // Not authenticated
       setUser(null);
+      router.replace('/login');
     } finally {
       setLoading(false);
+      setChecking(false);
     }
   };
 
-  useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated) {
-        router.replace('/login');
-      } else {
-        router.replace('/(tabs)');
-      }
-    }
-  }, [isAuthenticated, isLoading]);
-
-  if (isLoading) {
+  if (checking) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#10B981" />
