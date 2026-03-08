@@ -462,7 +462,11 @@ async def get_delivery_detail(delivery_id: str, user: User = Depends(require_aut
 
 RSS_FEEDS = {
     "ibama": "https://www.gov.br/ibama/pt-br/assuntos/noticias/rss.xml",
-    "agencia_brasil": "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/",
+    "mma": "https://www.gov.br/mma/pt-br/assuntos/noticias/rss.xml",
+    "agencia_brasil": "https://agenciabrasil.ebc.com.br/rss/meio-ambiente.xml",
+    "g1_meio_ambiente": "https://g1.globo.com/meio-ambiente/rss2.xml",
+    "g1_natureza": "https://g1.globo.com/natureza/desafio-natureza/rss.xml",
+    "oeco": "https://oeco.org.br/feed/",
 }
 
 async def fetch_news_from_rss():

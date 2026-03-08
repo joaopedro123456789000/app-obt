@@ -6,14 +6,14 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { collectionPointsApi } from '../../utils/api';
+import { collectionPointsApi, calculateDistance } from '../../utils/api';
 import { CollectionPoint } from '../../types';
 import { useRouter } from 'expo-router';
+import { useThemeStore, colors } from '../../store/useThemeStore';
 
 const WASTE_TYPES = [
   { key: 'all', label: 'Todos', icon: 'apps', color: '#6B7280' },
@@ -27,11 +27,15 @@ const WASTE_TYPES = [
 
 export default function MapScreen() {
   const router = useRouter();
+  const { theme } = useThemeStore();
+  const themeColors = colors[theme];
+  
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [points, setPoints] = useState<CollectionPoint[]>([]);
   const [filteredPoints, setFilteredPoints] = useState<CollectionPoint[]>([]);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     requestLocationPermission();
@@ -44,6 +48,7 @@ export default function MapScreen() {
 
   const requestLocationPermission = async () => {
     try {
+      setLocationLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         const loc = await Location.getCurrentPositionAsync({});
@@ -51,6 +56,8 @@ export default function MapScreen() {
       }
     } catch (error) {
       console.error('Location error:', error);
+    } finally {
+      setLocationLoading(false);
     }
   };
 
@@ -61,21 +68,33 @@ export default function MapScreen() {
       setPoints(data);
       setFilteredPoints(data);
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível carregar os pontos');
+      console.error('Load points error:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const filterPoints = () => {
-    if (selectedFilter === 'all') {
-      setFilteredPoints(points);
-    } else {
-      const filtered = points.filter((p) =>
-        p.types_accepted.includes(selectedFilter)
-      );
-      setFilteredPoints(filtered);
+    let filtered = points;
+    
+    if (selectedFilter !== 'all') {
+      filtered = points.filter((p) => p.types_accepted.includes(selectedFilter));
     }
+
+    // Calculate distance and sort by proximity if location available
+    if (location) {
+      filtered = filtered.map((point) => ({
+        ...point,
+        distance_km: calculateDistance(
+          location.coords.latitude,
+          location.coords.longitude,
+          point.latitude,
+          point.longitude
+        ),
+      })).sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
+    }
+
+    setFilteredPoints(filtered);
   };
 
   const getPointIcon = (point: CollectionPoint) => {
@@ -91,29 +110,41 @@ export default function MapScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#10B981" />
+      <View style={[styles.centerContainer, { backgroundColor: themeColors.background }]}>
+        <ActivityIndicator size=\"large\" color={themeColors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <ScrollView style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: themeColors.primary }]}>
           <Text style={styles.headerTitle}>Pontos de Coleta</Text>
-          <Text style={styles.headerSubtitle}>
-            {filteredPoints.length} ponto{filteredPoints.length !== 1 ? 's' : ''} próximo{filteredPoints.length !== 1 ? 's' : ''}
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerSubtitle}>
+              {filteredPoints.length} ponto{filteredPoints.length !== 1 ? 's' : ''}
+            </Text>
+            {locationLoading && (
+              <ActivityIndicator size=\"small\" color=\"#FFF\" style={{ marginLeft: 8 }} />
+            )}
+            {location && !locationLoading && (
+              <View style={styles.locationBadge}>
+                <Ionicons name=\"navigate\" size={12} color=\"#10B981\" />
+                <Text style={styles.locationText}>Ordenado por proximidade</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        <View style={styles.filterContainer}>
+        <View style={[styles.filterContainer, { backgroundColor: themeColors.surface, borderBottomColor: themeColors.border }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {WASTE_TYPES.map((type) => (
               <TouchableOpacity
                 key={type.key}
                 style={[
                   styles.filterButton,
+                  { backgroundColor: themeColors.background },
                   selectedFilter === type.key && {
                     backgroundColor: type.color,
                   },
@@ -128,6 +159,7 @@ export default function MapScreen() {
                 <Text
                   style={[
                     styles.filterText,
+                    { color: themeColors.text },
                     selectedFilter === type.key && styles.filterTextActive,
                   ]}
                 >
@@ -140,7 +172,10 @@ export default function MapScreen() {
 
         <View style={styles.pointsList}>
           {filteredPoints.map((point) => (
-            <View key={point.point_id} style={styles.pointCard}>
+            <View key={point.point_id} style={[styles.pointCard, { backgroundColor: themeColors.surface }, Platform.select({
+              web: { boxShadow: `0 2px 8px ${theme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'}` },
+              default: {},
+            })]}>
               <View
                 style={[
                   styles.pointIcon,
@@ -155,25 +190,35 @@ export default function MapScreen() {
               </View>
 
               <View style={styles.pointInfo}>
-                <Text style={styles.pointName}>{point.name}</Text>
-                <Text style={styles.pointAddress}>{point.address}</Text>
-                <Text style={styles.pointCity}>
+                <Text style={[styles.pointName, { color: themeColors.text }]}>{point.name}</Text>
+                <Text style={[styles.pointAddress, { color: themeColors.textSecondary }]}>{point.address}</Text>
+                <Text style={[styles.pointCity, { color: themeColors.textTertiary }]}>
                   {point.city}, {point.state}
                 </Text>
+                {point.distance_km !== undefined && (
+                  <View style={styles.distanceRow}>
+                    <Ionicons name=\"navigate\" size={14} color={themeColors.primary} />
+                    <Text style={[styles.distance, { color: themeColors.primary }]}>
+                      {point.distance_km < 1 
+                        ? `${(point.distance_km * 1000).toFixed(0)}m` 
+                        : `${point.distance_km.toFixed(1)}km`}
+                    </Text>
+                  </View>
+                )}
                 {point.hours && (
-                  <Text style={styles.pointHours}>
-                    <Ionicons name="time" size={12} /> {point.hours}
+                  <Text style={[styles.pointHours, { color: themeColors.success }]}>
+                    <Ionicons name=\"time\" size={12} /> {point.hours}
                   </Text>
                 )}
                 <View style={styles.pointTypes}>
                   {point.types_accepted.slice(0, 4).map((type) => (
-                    <View key={type} style={styles.typeTag}>
-                      <Text style={styles.typeTagText}>{type}</Text>
+                    <View key={type} style={[styles.typeTag, { backgroundColor: themeColors.background }]}>
+                      <Text style={[styles.typeTagText, { color: themeColors.textSecondary }]}>{type}</Text>
                     </View>
                   ))}
                   {point.types_accepted.length > 4 && (
-                    <View style={styles.typeTag}>
-                      <Text style={styles.typeTagText}>
+                    <View style={[styles.typeTag, { backgroundColor: themeColors.background }]}>
+                      <Text style={[styles.typeTagText, { color: themeColors.textSecondary }]}>
                         +{point.types_accepted.length - 4}
                       </Text>
                     </View>
@@ -183,7 +228,7 @@ export default function MapScreen() {
 
               {point.is_school && (
                 <View style={styles.schoolBadge}>
-                  <Ionicons name="school" size={16} color="#F59E0B" />
+                  <Ionicons name=\"school\" size={16} color=\"#F59E0B\" />
                 </View>
               )}
             </View>
@@ -191,9 +236,9 @@ export default function MapScreen() {
         </View>
 
         {Platform.OS === 'web' && (
-          <View style={styles.webNotice}>
-            <Ionicons name="information-circle" size={24} color="#3B82F6" />
-            <Text style={styles.webNoticeText}>
+          <View style={[styles.webNotice, { backgroundColor: themeColors.info + '20' }]}>
+            <Ionicons name=\"information-circle\" size={24} color={themeColors.info} />
+            <Text style={[styles.webNoticeText, { color: themeColors.info }]}>
               O mapa interativo está disponível no app mobile. Use o Expo Go para a experiência completa!
             </Text>
           </View>
@@ -201,10 +246,16 @@ export default function MapScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: themeColors.primary }, Platform.select({
+          web: {
+            boxShadow: `0 4px 12px ${themeColors.primary}66`,
+            cursor: 'pointer',
+          },
+          default: {},
+        })]}
         onPress={() => router.push('/deliver')}
       >
-        <Ionicons name="camera" size={32} color="#FFF" />
+        <Ionicons name=\"camera\" size={32} color=\"#FFF\" />
       </TouchableOpacity>
     </View>
   );
@@ -213,7 +264,6 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   centerContainer: {
     flex: 1,
@@ -225,7 +275,6 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    backgroundColor: '#10B981',
   },
   headerTitle: {
     fontSize: 28,
@@ -233,21 +282,37 @@ const styles = StyleSheet.create({
     color: '#FFF',
     marginBottom: 4,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerSubtitle: {
     fontSize: 14,
     color: '#D1FAE5',
   },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  locationText: {
+    fontSize: 10,
+    color: '#10B981',
+    marginLeft: 4,
+    fontWeight: '600',
+  },
   filterContainer: {
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
@@ -257,7 +322,6 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
   },
   filterTextActive: {
     color: '#FFF',
@@ -267,7 +331,6 @@ const styles = StyleSheet.create({
   },
   pointCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -291,22 +354,28 @@ const styles = StyleSheet.create({
   pointName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 4,
   },
   pointAddress: {
     fontSize: 14,
-    color: '#6B7280',
     marginBottom: 2,
   },
   pointCity: {
     fontSize: 12,
-    color: '#9CA3AF',
     marginBottom: 8,
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  distance: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
   pointHours: {
     fontSize: 12,
-    color: '#10B981',
     marginBottom: 8,
   },
   pointTypes: {
@@ -315,14 +384,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   typeTag: {
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   typeTagText: {
     fontSize: 10,
-    color: '#6B7280',
     textTransform: 'uppercase',
   },
   schoolBadge: {
@@ -332,7 +399,6 @@ const styles = StyleSheet.create({
   },
   webNotice: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
     margin: 16,
     padding: 16,
     borderRadius: 12,
@@ -342,7 +408,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 14,
-    color: '#1E40AF',
     lineHeight: 20,
   },
   fab: {
@@ -352,7 +417,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
