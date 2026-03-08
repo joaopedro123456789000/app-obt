@@ -9,7 +9,6 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { collectionPointsApi } from '../../utils/api';
@@ -33,12 +32,6 @@ export default function MapScreen() {
   const [filteredPoints, setFilteredPoints] = useState<CollectionPoint[]>([]);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [region, setRegion] = useState({
-    latitude: -23.5505,
-    longitude: -46.6333,
-    latitudeDelta: 0.1,
-    longitudeDelta: 0.1,
-  });
 
   useEffect(() => {
     requestLocationPermission();
@@ -55,12 +48,6 @@ export default function MapScreen() {
       if (status === 'granted') {
         const loc = await Location.getCurrentPositionAsync({});
         setLocation(loc);
-        setRegion({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        });
       }
     } catch (error) {
       console.error('Location error:', error);
@@ -91,73 +78,127 @@ export default function MapScreen() {
     }
   };
 
-  const getMarkerColor = (point: CollectionPoint) => {
+  const getPointIcon = (point: CollectionPoint) => {
+    if (point.is_school) return 'school';
+    return 'location';
+  };
+
+  const getPointColor = (point: CollectionPoint) => {
     if (point.is_school) return '#F59E0B';
     if (point.capacity_percentage > 80) return '#EF4444';
     return '#10B981';
   };
 
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#10B981" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        region={region}
-        showsUserLocation
-        showsMyLocationButton
-        provider={PROVIDER_DEFAULT}
-      >
-        {filteredPoints.map((point) => (
-          <Marker
-            key={point.point_id}
-            coordinate={{
-              latitude: point.latitude,
-              longitude: point.longitude,
-            }}
-            pinColor={getMarkerColor(point)}
-            title={point.name}
-            description={`${point.address} - ${point.hours || 'Horário não informado'}`}
-          />
-        ))}
-      </MapView>
+      <ScrollView style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Pontos de Coleta</Text>
+          <Text style={styles.headerSubtitle}>
+            {filteredPoints.length} ponto{filteredPoints.length !== 1 ? 's' : ''} próximo{filteredPoints.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
 
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {WASTE_TYPES.map((type) => (
-            <TouchableOpacity
-              key={type.key}
-              style={[
-                styles.filterButton,
-                selectedFilter === type.key && {
-                  backgroundColor: type.color,
-                },
-              ]}
-              onPress={() => setSelectedFilter(type.key)}
-            >
-              <Ionicons
-                name={type.icon as any}
-                size={20}
-                color={selectedFilter === type.key ? '#FFF' : type.color}
-              />
-              <Text
+        <View style={styles.filterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {WASTE_TYPES.map((type) => (
+              <TouchableOpacity
+                key={type.key}
                 style={[
-                  styles.filterText,
-                  selectedFilter === type.key && styles.filterTextActive,
+                  styles.filterButton,
+                  selectedFilter === type.key && {
+                    backgroundColor: type.color,
+                  },
+                ]}
+                onPress={() => setSelectedFilter(type.key)}
+              >
+                <Ionicons
+                  name={type.icon as any}
+                  size={20}
+                  color={selectedFilter === type.key ? '#FFF' : type.color}
+                />
+                <Text
+                  style={[
+                    styles.filterText,
+                    selectedFilter === type.key && styles.filterTextActive,
+                  ]}
+                >
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <View style={styles.pointsList}>
+          {filteredPoints.map((point) => (
+            <View key={point.point_id} style={styles.pointCard}>
+              <View
+                style={[
+                  styles.pointIcon,
+                  { backgroundColor: getPointColor(point) + '20' },
                 ]}
               >
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+                <Ionicons
+                  name={getPointIcon(point) as any}
+                  size={32}
+                  color={getPointColor(point)}
+                />
+              </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statBox}>
-          <Ionicons name="location" size={24} color="#10B981" />
-          <Text style={styles.statNumber}>{filteredPoints.length}</Text>
-          <Text style={styles.statLabel}>Pontos</Text>
+              <View style={styles.pointInfo}>
+                <Text style={styles.pointName}>{point.name}</Text>
+                <Text style={styles.pointAddress}>{point.address}</Text>
+                <Text style={styles.pointCity}>
+                  {point.city}, {point.state}
+                </Text>
+                {point.hours && (
+                  <Text style={styles.pointHours}>
+                    <Ionicons name="time" size={12} /> {point.hours}
+                  </Text>
+                )}
+                <View style={styles.pointTypes}>
+                  {point.types_accepted.slice(0, 4).map((type) => (
+                    <View key={type} style={styles.typeTag}>
+                      <Text style={styles.typeTagText}>{type}</Text>
+                    </View>
+                  ))}
+                  {point.types_accepted.length > 4 && (
+                    <View style={styles.typeTag}>
+                      <Text style={styles.typeTagText}>
+                        +{point.types_accepted.length - 4}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {point.is_school && (
+                <View style={styles.schoolBadge}>
+                  <Ionicons name="school" size={16} color="#F59E0B" />
+                </View>
+              )}
+            </View>
+          ))}
         </View>
-      </View>
+
+        {Platform.OS === 'web' && (
+          <View style={styles.webNotice}>
+            <Ionicons name="information-circle" size={24} color="#3B82F6" />
+            <Text style={styles.webNoticeText}>
+              O mapa interativo está disponível no app mobile. Use o Expo Go para a experiência completa!
+            </Text>
+          </View>
+        )}
+      </ScrollView>
 
       <TouchableOpacity
         style={styles.fab}
@@ -172,30 +213,45 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F9FAFB',
   },
-  map: {
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
     flex: 1,
   },
+  header: {
+    padding: 20,
+    backgroundColor: '#10B981',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#D1FAE5',
+  },
   filterContainer: {
-    position: 'absolute',
-    top: 16,
-    left: 0,
-    right: 0,
+    paddingVertical: 16,
     paddingHorizontal: 16,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
+    backgroundColor: '#F3F4F6',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     marginRight: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   filterText: {
     marginLeft: 6,
@@ -206,31 +262,88 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#FFF',
   },
-  statsContainer: {
-    position: 'absolute',
-    bottom: 80,
-    left: 16,
+  pointsList: {
+    padding: 16,
+  },
+  pointCard: {
+    flexDirection: 'row',
     backgroundColor: '#FFF',
     borderRadius: 16,
-    padding: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 3,
   },
-  statBox: {
+  pointIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#065F46',
-    marginTop: 4,
+  pointInfo: {
+    flex: 1,
+    marginLeft: 16,
   },
-  statLabel: {
-    fontSize: 12,
+  pointName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  pointAddress: {
+    fontSize: 14,
     color: '#6B7280',
+    marginBottom: 2,
+  },
+  pointCity: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  pointHours: {
+    fontSize: 12,
+    color: '#10B981',
+    marginBottom: 8,
+  },
+  pointTypes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  typeTag: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  typeTagText: {
+    fontSize: 10,
+    color: '#6B7280',
+    textTransform: 'uppercase',
+  },
+  schoolBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  webNotice: {
+    flexDirection: 'row',
+    backgroundColor: '#EFF6FF',
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  webNoticeText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#1E40AF',
+    lineHeight: 20,
   },
   fab: {
     position: 'absolute',
