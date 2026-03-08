@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { deliveriesApi } from '../../utils/api';
@@ -33,39 +34,58 @@ const WASTE_COLORS = {
   organic: '#84CC16',
 };
 
+// Mock deliveries for demo
+const MOCK_DELIVERIES: Delivery[] = [
+  {
+    delivery_id: 'del_1',
+    user_id: 'demo_user_123',
+    point_id: 'point_1',
+    waste_type: 'plastic',
+    weight_kg: 2.5,
+    points_earned: 25,
+    co2_saved_kg: 3.75,
+    confidence: 0.92,
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    delivery_id: 'del_2',
+    user_id: 'demo_user_123',
+    point_id: 'point_2',
+    waste_type: 'paper',
+    weight_kg: 5.0,
+    points_earned: 40,
+    co2_saved_kg: 4.0,
+    confidence: 0.88,
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    delivery_id: 'del_3',
+    user_id: 'demo_user_123',
+    point_id: 'point_1',
+    waste_type: 'glass',
+    weight_kg: 3.0,
+    points_earned: 36,
+    co2_saved_kg: 0.9,
+    confidence: 0.95,
+    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 export default function DeliveriesScreen() {
   const router = useRouter();
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [deliveries, setDeliveries] = useState<Delivery[]>(MOCK_DELIVERIES);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    loadDeliveries();
-  }, []);
-
-  const loadDeliveries = async () => {
-    try {
-      setLoading(true);
-      const data = await deliveriesApi.getDeliveries();
-      setDeliveries(data);
-    } catch (error) {
-      console.error('Load deliveries error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadDeliveries();
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   };
 
   const renderDelivery = ({ item }: { item: Delivery }) => (
-    <TouchableOpacity
-      style={styles.deliveryCard}
-      onPress={() => router.push(`/delivery-detail?id=${item.delivery_id}`)}
-    >
+    <View style={styles.deliveryCard}>
       <View
         style={[
           styles.iconContainer,
@@ -97,58 +117,31 @@ export default function DeliveriesScreen() {
           <Text style={styles.statLabel}>kg CO₂</Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#10B981" />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      {deliveries.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="cube-outline" size={64} color="#D1D5DB" />
-          <Text style={styles.emptyTitle}>Nenhuma entrega ainda</Text>
-          <Text style={styles.emptyText}>
-            Faça sua primeira entrega e comece a ganhar pontos!
-          </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => router.push('/deliver')}
-          >
-            <Ionicons name="camera" size={20} color="#FFF" />
-            <Text style={styles.buttonText}>Registrar Entrega</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={deliveries}
-          renderItem={renderDelivery}
-          keyExtractor={(item) => item.delivery_id}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#10B981"
-            />
-          }
-        />
-      )}
+      <FlatList
+        data={deliveries}
+        renderItem={renderDelivery}
+        keyExtractor={(item) => item.delivery_id}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#10B981"
+          />
+        }
+      />
 
-      {deliveries.length > 0 && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/deliver')}
-        >
-          <Ionicons name="add" size={32} color="#FFF" />
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/deliver')}
+      >
+        <Ionicons name="add" size={32} color="#FFF" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -157,11 +150,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   listContainer: {
     padding: 16,
@@ -172,11 +160,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
   },
   iconContainer: {
     width: 64,
@@ -221,39 +216,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#6B7280',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    backgroundColor: '#10B981',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
   fab: {
     position: 'absolute',
     right: 16,
@@ -264,10 +226,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(16,185,129,0.4)',
+        cursor: 'pointer',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+      },
+    }),
   },
 });

@@ -4,42 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Image,
-  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
-import { authApi } from '../../utils/api';
-import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    Alert.alert(
-      'Sair',
-      'Tem certeza que deseja sair?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sair',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await authApi.logout();
-              logout();
-              router.replace('/login');
-            } catch (error) {
-              console.error('Logout error:', error);
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
+  const { user } = useAuthStore();
 
   if (!user) {
     return null;
@@ -48,13 +19,9 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        {user.picture ? (
-          <Image source={{ uri: user.picture }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Ionicons name="person" size={48} color="#9CA3AF" />
-          </View>
-        )}
+        <View style={styles.avatarPlaceholder}>
+          <Ionicons name="person" size={48} color="#FFF" />
+        </View>
         <Text style={styles.name}>{user.name}</Text>
         <Text style={styles.email}>{user.email}</Text>
         <View style={styles.levelBadge}>
@@ -102,24 +69,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <View style={styles.menuSection}>
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="trophy" size={24} color="#10B981" />
-          <Text style={styles.menuText}>Conquistas</Text>
-          <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="time" size={24} color="#10B981" />
-          <Text style={styles.menuText}>Histórico</Text>
-          <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="settings" size={24} color="#10B981" />
-          <Text style={styles.menuText}>Configurações</Text>
-          <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.aboutSection}>
         <Text style={styles.sectionTitle}>Sobre o EcoPonto BR</Text>
         <Text style={styles.aboutText}>
@@ -136,14 +85,10 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out" size={20} color="#EF4444" />
-        <Text style={styles.logoutText}>Sair da Conta</Text>
-      </TouchableOpacity>
-
       <View style={styles.footer}>
         <Text style={styles.footerText}>EcoPonto BR v1.0.0</Text>
-        <Text style={styles.footerText}>Feito com ♥️ para o Brasil</Text>
+        <Text style={styles.footerText}>Feito com ❤️ para o Brasil</Text>
+        <Text style={styles.demoText}>🎯 Versão Demo - Todas as funcionalidades habilitadas</Text>
       </View>
     </ScrollView>
   );
@@ -160,18 +105,11 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     alignItems: 'center',
   },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 4,
-    borderColor: '#FFF',
-  },
   avatarPlaceholder: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#FFF',
+    backgroundColor: '#059669',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -212,11 +150,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+    }),
   },
   statValue: {
     fontSize: 20,
@@ -262,31 +207,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
-  menuSection: {
-    backgroundColor: '#FFF',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  menuText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    marginLeft: 12,
-  },
   aboutSection: {
     padding: 16,
   },
@@ -311,31 +231,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  logoutButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    marginHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    marginBottom: 24,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
-    marginLeft: 8,
-  },
   footer: {
     alignItems: 'center',
     paddingBottom: 32,
+    paddingTop: 16,
   },
   footerText: {
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 4,
+  },
+  demoText: {
+    fontSize: 12,
+    color: '#10B981',
+    marginTop: 12,
+    fontWeight: '600',
   },
 });
