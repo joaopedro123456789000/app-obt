@@ -174,7 +174,7 @@ async def require_auth(request: Request) -> User:
 
 # ==================== AUTH ROUTES ====================
 
-@api_router.post("/auth/google-login")
+@api_router.get("/auth/google-login")
 async def google_login(request: Request):
     """Redirect to Emergent Google OAuth"""
     # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
